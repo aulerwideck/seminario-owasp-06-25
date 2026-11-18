@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Comissões — demo A06</title>
+<style>
+  :root { --tinta:#1b1f24; --suave:#5b6470; --linha:#d9dde3; --fundo:#f6f7f9; --ruim:#b42318; --bom:#067647; --acento:#1f4fd1; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--tinta); background:var(--fundo); }
+  header { display:flex; align-items:center; gap:12px; padding:14px 24px; background:#fff; border-bottom:1px solid var(--linha); }
+  header h1 { font-size:18px; margin:0; }
+  .selo { padding:3px 10px; border-radius:99px; font-weight:700; font-size:12px; letter-spacing:.04em; color:#fff; }
+  .selo.vulneravel { background:var(--ruim); } .selo.corrigido { background:var(--bom); }
+  header .dir { margin-left:auto; display:flex; gap:8px; align-items:center; color:var(--suave); }
+  main { display:grid; grid-template-columns: 1fr 1.1fr; gap:18px; padding:18px 24px; max-width:1280px; margin:auto; }
+  section { background:#fff; border:1px solid var(--linha); border-radius:10px; padding:16px; }
+  section + section { margin-top:18px; }
+  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--suave); margin:0 0 10px; }
+  .kpis { display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; }
+  .kpi { color:var(--suave); font-size:13px; } .kpi b { display:block; color:var(--tinta); font-size:22px; font-variant-numeric:tabular-nums; }
+  .barra { height:10px; background:#e8ebef; border-radius:99px; overflow:hidden; margin:12px 0 4px; }
+  .barra div { height:100%; background:var(--acento); }
+  select, input, button { font:inherit; } input, select { padding:6px 8px; border:1px solid var(--linha); border-radius:6px; }
+  button { padding:7px 14px; border-radius:6px; border:1px solid var(--linha); background:#fff; cursor:pointer; }
+  button.primario { background:var(--acento); border-color:var(--acento); color:#fff; }
+  .requisicao { display:flex; gap:8px; } .requisicao .metodo { font-weight:700; color:var(--bom); padding:7px 10px; border:1px solid var(--linha); border-radius:6px; }
+  .requisicao input { flex:1; font:13px ui-monospace, Menlo, Consolas, monospace; }
+  pre { background:#0f1419; color:#e6e6e6; padding:10px; border-radius:6px; overflow:auto; font-size:13px; max-height:300px; margin:8px 0 0; }
+  table { width:100%; border-collapse:collapse; } td, th { padding:6px; border-bottom:1px solid var(--linha); text-align:left; font-size:14px; }
+  td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
+  .dica { color:var(--suave); font-size:13px; }
+  .ok { color:var(--bom); font-weight:600; } .falha { color:var(--ruim); font-weight:600; }
+  .oculto { display:none; }
+  @media (max-width: 900px) { main { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Comissões · Relatório de metas</h1><span id="selo" class="selo">…</span>
+  <div class="dir">
+    <span id="quem">não autenticado</span>
+    <select id="usuario" title="Usuário da demo"></select>
+    <button onclick="entrar()">Entrar</button>
+  </div>
+</header>
+
+<main>
+  <div>
+    <section>
+      <h2>Meu relatório · outubro de 2026</h2>
+      <div id="nome" style="font-weight:600; margin-bottom:8px">—</div>
+      <div class="kpis">
+        <div class="kpi">Meta<b id="meta">—</b></div>
+        <div class="kpi">Vendido<b id="vendido">—</b></div>
+        <div class="kpi">Comissão<b id="comissao">—</b></div>
+      </div>
+      <div class="barra"><div id="barra" style="width:0"></div></div>
+      <div class="dica" id="atingimento">—</div>
+    </section>
+    <section id="caixaEquipe" class="oculto">
+      <h2>Relatórios que posso ver (decidido pelo servidor)</h2>
+      <table><thead><tr><th>Pessoa</th><th>Equipe</th><th class="num">Atingimento</th><th class="num">Comissão</th></tr></thead>
+        <tbody id="equipe"></tbody></table>
+    </section>
+    <section id="caixaAuditoria" class="oculto">
+      <h2>Auditoria · quem tentou ver o quê</h2>
+      <table><thead><tr><th>Evento</th><th>Quem</th><th>Alvo</th></tr></thead><tbody id="auditoria"></tbody></table>
+    </section>
+  </div>
+
+  <div>
+    <section>
+      <h2>Requisição que o app envia</h2>
+      <p class="dica">É a chamada que o app faz para montar “Meu relatório”. Para reproduzir o caso, troque o e-mail no fim do endereço e clique em Enviar.</p>
+      <div class="requisicao">
+        <span class="metodo">GET</span>
+        <input id="url" spellcheck="false">
+        <button class="primario" onclick="enviar()">Enviar</button>
+      </div>
+      <p class="dica" id="cab">Authorization: Bearer …</p>
+      <h2 style="margin-top:14px">Resposta</h2>
+      <div id="status" class="dica">—</div>
+      <pre id="resposta">—</pre>
+    </section>
+  </div>
+</main>
+
+<script>
+const USUARIOS = [
+  ["ana.souza@empresa.demo", "ana123", "Ana · vendedora Sul"],
+  ["bruno.lima@empresa.demo", "bruno123", "Bruno · vendedor Sul"],
+  ["eduardo.reis@empresa.demo", "eduardo123", "Eduardo · vendedor Norte"],
+  ["diego.alves@empresa.demo", "diego123", "Diego · gestor Sul"],
+  ["fernanda.costa@empresa.demo", "fernanda123", "Fernanda · financeiro"],
+];
+let token = null, versao = null, eu = null;
+const brl = v => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const $ = id => document.getElementById(id);
+
+async function api(caminho, opcoes = {}) {
+  const cab = { "Content-Type": "application/json" };
+  if (token) cab.Authorization = "Bearer " + token;
+  const r = await fetch(caminho, { ...opcoes, headers: cab });
+  let corpo; try { corpo = await r.json(); } catch { corpo = null; }
+  return { status: r.status, corpo };
+}
+
+async function iniciar() {
+  versao = (await api("/api/info")).corpo.versao;
+  $("selo").textContent = versao === "vulneravel" ? "VERSÃO VULNERÁVEL" : "VERSÃO CORRIGIDA";
+  $("selo").className = "selo " + versao;
+  $("usuario").innerHTML = USUARIOS.map((u, i) => `<option value="${i}">${u[2]}</option>`).join("");
+  await entrar();
+}
+
+async function entrar() {
+  const [email, senha] = USUARIOS[$("usuario").value];
+  token = null;
+  const r = await api("/api/login", { method: "POST", body: JSON.stringify({ email, senha }) });
+  token = r.corpo.token;
+  $("cab").textContent = "Authorization: Bearer " + token.slice(0, 24) + "…";
+  eu = (await api("/api/me")).corpo;
+  $("quem").textContent = eu.nome + " · " + eu.email;
+  // A versão vulnerável manda o e-mail de quem está logado; a corrigida não manda nada:
+  // quem decide de quem é o relatório é o servidor, pelo token.
+  $("url").value = versao === "vulneravel" ? `/api/relatorio-metas?email=${eu.email}` : "/api/relatorio-metas";
+  await meuRelatorio();
+  await painelExtra();
+  $("status").textContent = "—"; $("resposta").textContent = "—";
+}
+
+async function meuRelatorio() {
+  const url = versao === "vulneravel" ? `/api/relatorio-metas?email=${eu.email}` : "/api/relatorio-metas";
+  const r = (await api(url)).corpo;
+  $("nome").textContent = r.nome + (r.equipe ? " · equipe " + r.equipe : "");
+  const tem = r.meta !== undefined;
+  $("meta").textContent = tem ? brl(r.meta) : "—";
+  $("vendido").textContent = tem ? brl(r.vendido) : "—";
+  $("comissao").textContent = tem ? brl(r.comissao) : "—";
+  $("barra").style.width = tem ? Math.min(r.atingimento_pct, 100) + "%" : "0";
+  $("atingimento").textContent = tem ? `Atingimento: ${r.atingimento_pct}% da meta` : "Sem meta individual (financeiro)";
+}
+
+async function painelExtra() {
+  $("caixaEquipe").classList.add("oculto"); $("caixaAuditoria").classList.add("oculto");
+  if (versao !== "corrigido" || eu.papel === "vendedor") return;
+  const eq = (await api("/api/equipe")).corpo;
+  $("equipe").innerHTML = eq.map(p => `<tr><td>${p.nome}</td><td>${p.equipe}</td>
+    <td class="num">${p.atingimento_pct}%</td><td class="num">${brl(p.comissao)}</td></tr>`).join("");
+  $("caixaEquipe").classList.remove("oculto");
+  if (eu.papel === "financeiro") await carregarAuditoria();
+}
+
+async function carregarAuditoria() {
+  const a = await api("/api/auditoria");
+  if (a.status !== 200) return;
+  $("auditoria").innerHTML = a.corpo.map(x => `<tr><td>${x.evento}</td><td>${x.quem}</td><td>${x.alvo_email || "—"}</td></tr>`).join("")
+    || `<tr><td colspan="3" class="dica">Nada registrado ainda.</td></tr>`;
+  $("caixaAuditoria").classList.remove("oculto");
+}
+
+async function enviar() {
+  const r = await api($("url").value.trim());
+  $("status").innerHTML = r.status < 300 ? `<span class="ok">HTTP ${r.status}</span>` : `<span class="falha">HTTP ${r.status}</span>`;
+  $("resposta").textContent = JSON.stringify(r.corpo, null, 2);
+}
+
+iniciar();
+</script>
+</body>
+</html>

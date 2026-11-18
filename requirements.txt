@@ -1,0 +1,4 @@
+flask>=3.0
+pyjwt>=2.8
+requests>=2.31
+pytest>=8
